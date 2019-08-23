@@ -75,6 +75,13 @@ func ValidatePublicKey(publicKey interface{}) (bool, error) {
 	case string:
 		// at the moment we don't care about the pub interface
 
+		// fix weirdly labeled public keys with an old style BEGIN but
+		// a new style END - go 1.8's encoding/pem has become strict
+		// about the ending line.
+		if strings.HasPrefix(publicKey, "-----BEGIN RSA PUBLIC KEY-----") && strings.HasSuffix(publicKey, "-----END PUBLIC KEY-----") {
+			publicKey = strings.Replace(publicKey, "-----BEGIN RSA PUBLIC KEY-----", "-----BEGIN PUBLIC KEY-----", 1)
+		}
+
 		decPubKey, z := pem.Decode([]byte(publicKey))
 		if decPubKey == nil {
 			err := fmt.Errorf("Public key does not validate: %s", z)
@@ -120,6 +127,9 @@ func HeaderDecrypt(pkPem string, data string) ([]byte, error) {
 	/* skip past the 0xff padding added to the header before encrypting. */
 	skip := 0
 	for i := 2; i < len(dec); i++ {
+		if i+1 >= len(dec) {
+			break
+		}
 		if dec[i] == 0xff && dec[i+1] == 0 {
 			skip = i + 2
 			break
@@ -128,9 +138,19 @@ func HeaderDecrypt(pkPem string, data string) ([]byte, error) {
 	return dec[skip:], nil
 }
 
-// Auth12HeaderVerify verifies the newer version 1.2 Chef authentication protocol
-// headers.
+// Auth12HeaderVerify verifies the newer version 1.2 Chef authentication
+// protocol headers.
 func Auth12HeaderVerify(pkPem string, hashed, sig []byte) error {
+	return signHeaderVerifyBase(pkPem, hashed, sig, crypto.SHA1)
+}
+
+// Auth12HeaderVerify verifies the even newer version 1.3 Chef authentication
+// protocol headers
+func Auth13HeaderVerify(pkPem string, hashed, sig []byte) error {
+	return signHeaderVerifyBase(pkPem, hashed, sig, crypto.SHA256)
+}
+
+func signHeaderVerifyBase(pkPem string, hashed, sig []byte, algo crypto.Hash) error {
 	block, _ := pem.Decode([]byte(pkPem))
 	if block == nil {
 		return fmt.Errorf("Invalid block size for '%s'", pkPem)
@@ -139,7 +159,7 @@ func Auth12HeaderVerify(pkPem string, hashed, sig []byte) error {
 	if err != nil {
 		return err
 	}
-	return rsa.VerifyPKCS1v15(pubKey.(*rsa.PublicKey), crypto.SHA1, hashed, sig)
+	return rsa.VerifyPKCS1v15(pubKey.(*rsa.PublicKey), algo, hashed, sig)
 }
 
 // SignTextBlock signs a block of text using the provided private RSA key. Used

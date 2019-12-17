@@ -30,6 +30,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -42,30 +43,17 @@ func GenerateRSAKeys() (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	if err := priv.Validate(); err != nil {
-		errStr := fmt.Errorf("RSA key validation failed: %s", err)
-		return "", "", errStr
-	}
-	privDer := x509.MarshalPKCS1PrivateKey(priv)
-	/* For some reason chef doesn't label the keys RSA PRIVATE/PUBLIC KEY */
-	privBlk := pem.Block{
-		Type:    "RSA PRIVATE KEY",
-		Headers: nil,
-		Bytes:   privDer,
-	}
-	privPem := string(pem.EncodeToMemory(&privBlk))
-	pub := priv.PublicKey
-	pubDer, err := x509.MarshalPKIXPublicKey(&pub)
+
+	privPem, err := PrivateKeyToString(priv)
 	if err != nil {
-		errStr := fmt.Errorf("Failed to get der format for public key: %s", err)
-		return "", "", errStr
+		return nil, err
 	}
-	pubBlk := pem.Block{
-		Type:    "PUBLIC KEY",
-		Headers: nil,
-		Bytes:   pubDer,
+
+	pubPem, err := PublicKeyToString(priv.PublicKey)
+	if err != nil {
+		return nil, err
 	}
-	pubPem := string(pem.EncodeToMemory(&pubBlk))
+
 	return privPem, pubPem, nil
 }
 
@@ -207,4 +195,43 @@ func GenerateSalt() ([]byte, error) {
 		return nil, err
 	}
 	return b, nil
+}
+
+// PrivateKeyToString stringifies a private key.
+func PrivateKeyToString(priv *rsa.PrivateKey) (string, error) {
+	// may as well check and make sure this is a valid key first
+	if err := priv.Validate(); err != nil {
+		errStr := fmt.Errorf("RSA key validation failed: %s", err)
+		return "", errStr
+	}
+	privDer := x509.MarshalPKCS1PrivateKey(priv)
+	/* For some reason chef doesn't label the keys RSA PRIVATE/PUBLIC KEY */
+	privBlk := pem.Block{
+		Type:    "RSA PRIVATE KEY",
+		Headers: nil,
+		Bytes:   privDer,
+	}
+	privPem := string(pem.EncodeToMemory(&privBlk))
+	return privPem, nil
+}
+
+// PublicKeyToString stringifies a private key.
+func PublicKeyToString(pub rsa.PublicKey) (string, error) {
+	if pub == nil {
+		return nil, errors.New("PublicKey was nil, cannot be turned into a string.")
+	}
+
+	pubDer, err := x509.MarshalPKIXPublicKey(&pub)
+	if err != nil {
+		errStr := fmt.Errorf("Failed to get der format for public key: %s", err)
+		return "", errStr
+	}
+	pubBlk := pem.Block{
+		Type:    "PUBLIC KEY",
+		Headers: nil,
+		Bytes:   pubDer,
+	}
+	pubPem := string(pem.EncodeToMemory(&pubBlk))
+
+	return pubPem, nil
 }

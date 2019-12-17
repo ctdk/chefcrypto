@@ -30,7 +30,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -46,12 +45,12 @@ func GenerateRSAKeys() (string, string, error) {
 
 	privPem, err := PrivateKeyToString(priv)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
 	pubPem, err := PublicKeyToString(priv.PublicKey)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
 	return privPem, pubPem, nil
@@ -217,10 +216,6 @@ func PrivateKeyToString(priv *rsa.PrivateKey) (string, error) {
 
 // PublicKeyToString stringifies a private key.
 func PublicKeyToString(pub rsa.PublicKey) (string, error) {
-	if pub == nil {
-		return nil, errors.New("PublicKey was nil, cannot be turned into a string.")
-	}
-
 	pubDer, err := x509.MarshalPKIXPublicKey(&pub)
 	if err != nil {
 		errStr := fmt.Errorf("Failed to get der format for public key: %s", err)

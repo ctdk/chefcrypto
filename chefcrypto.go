@@ -30,6 +30,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -214,6 +215,23 @@ func PrivateKeyToString(priv *rsa.PrivateKey) (string, error) {
 	return privPem, nil
 }
 
+// PemToPrivateKey converts a given pem encoded private key into a proper and
+// usable *rsa.PrivateKey.
+func PemToPrivateKey(privPem string) (*rsa.PrivateKey, error) {
+	privBlk, _ := pem.Decode([]byte(privPem))
+	if privBlk == nil {
+		e := errors.New("Invalid block size for private key")
+		return nil, e
+	}
+
+	privKey, err := x509.ParsePKCS1PrivateKey(privBlk.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return privKey, nil
+}
+
 // PublicKeyToString stringifies a private key.
 func PublicKeyToString(pub rsa.PublicKey) (string, error) {
 	pubDer, err := x509.MarshalPKIXPublicKey(&pub)
@@ -229,4 +247,30 @@ func PublicKeyToString(pub rsa.PublicKey) (string, error) {
 	pubPem := string(pem.EncodeToMemory(&pubBlk))
 
 	return pubPem, nil
+}
+
+// PemToPublicKey converts a pem encoded public key to a proper rsa.PublicKey.
+func PemToPublicKey(pubPem string) (rsa.PublicKey, error) {
+	var pub rsa.PublicKey
+	var err error
+	block, _ := pem.Decode([]byte(pubPem))
+	if block == nil {
+		err = errors.New("Invalid block size for public key")
+		return pub, err
+	}
+
+	pint, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return pub, err
+	}
+
+	switch pint := pint.(type) {
+	case rsa.PublicKey:
+		pub = pint
+	default:
+		err = errors.New("Somehow the public key unmarshalled successfully, but still wasn't an rsa.PublicKey")
+		return pub, err
+	}
+
+	return pub, nil
 }

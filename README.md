@@ -9,6 +9,11 @@ Documentation
 
 See the godocs at https://pkg.go.dev/github.com/ctdk/chefcrypto.
 
+Version
+-------
+
+Along with some changes for goiardi 1.0.0, this module got set up with a `go.mod` file for excellence in go module support. Per the suggestions from the go people on the go modules documentation pages, the chefcrypto module's version has been bumped to `v1.0.0` -- not because any incompatible changes were made to support goiardi 1.0.0, but because it's set up for go modules now.
+
 AUTHOR
 ------
 
